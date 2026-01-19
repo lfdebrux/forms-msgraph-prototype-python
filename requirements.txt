@@ -1,15 +1,19 @@
 blinker==1.9.0
+cachelib==0.13.0
 certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
 click==8.3.1
 cryptography==46.0.3
 Flask==3.1.2
+Flask-Session==0.8.0
 idna==3.11
 itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
+ms-identity-python @ https://github.com/azure-samples/ms-identity-python/archive/refs/heads/0.9.zip#sha256=4322333417c2cb5c89056e5a8feca3c750a2753b67c558e85cb97ac4ff8b0fda
 msal==1.34.0
+msgspec==0.20.0
 pycparser==2.23
 PyJWT==2.10.1
 requests==2.32.5
