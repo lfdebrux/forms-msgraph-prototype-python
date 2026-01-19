@@ -1,3 +1,4 @@
+import requests
 from flask import Flask
 
 from identity.flask import Auth
@@ -42,4 +43,31 @@ def authenticated(*, context):
         <form action="/create" method="post">
             <button>Create an Excel spreadsheet in the application folder</button>
         </form>
+    """
+
+@app.route("/create", methods=["GET", "POST"])
+@auth.login_required(scopes=["Files.ReadWrite.AppFolder"])
+def create(*, context):
+    drives = requests.get(
+        "https://graph.microsoft.com/v1.0/me/drives",
+        headers={"Authorization": f"Bearer {context['access_token']}"},
+        timeout=30,
+    )
+
+    print(drives.json())
+
+    response = requests.get(
+        "https://graph.microsoft.com/v1.0/me/drive/special/approot",
+        headers={"Authorization": f"Bearer {context['access_token']}"},
+        timeout=30
+    )
+
+    print(response.json())
+
+    return f"""
+        <h1>Created Excel spreadsheet</h1>
+
+        <p>
+            {repr(response.json())}
+        </p>
     """
