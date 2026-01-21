@@ -58,7 +58,7 @@ def new(*, context):
     response.raise_for_status()
 
     drives = response.json()
-    print({"drives": drives})
+    #print({"drives": drives})
 
     # NOTE: we probably want to filter out OneDrive and ODCMetadataArchive
     # NOTE: might be better to look at sites rather than drives?
@@ -102,10 +102,10 @@ def create(*, context):
         response.raise_for_status()
 
         approot = response.json()
-        print({"approot": approot})
+        #print({"approot": approot})
 
         approot_item_id = approot["id"]
-        form_name = "Test form"
+        form_name = test_form["name"]
         file_name = f"{ form_name }.xlsx"
 
         # This is documented in https://learn.microsoft.com/en-us/answers/questions/830336/is-there-any-ms-graph-api-to-create-workbook-in-gi#answer-1348868 (and nowhere else?)
@@ -115,17 +115,80 @@ def create(*, context):
             json={
                 "name": file_name,
                 "file": { },
-                "@microsoft.graph.conflictBehavior": "rename",
+                "@microsoft.graph.conflictBehavior": "replace", # CHANGEME
             }
         )
         response.raise_for_status()
 
-        print(response.json())
+        file = response.json()
+        #print({ "file": file })
+
+        file_drive_item_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file['id']}"
+
+        # Working with Excel is better with a worbook session, see https://learn.microsoft.com/en-gb/graph/workbook-best-practice
+        response = session.post(
+            f"{file_drive_item_url}/workbook/createSession",
+            timeout=30,
+            json={ "persistChanges": True }
+        )
+        response.raise_for_status()
+
+        session.headers.update({ "workbook-session-id": response.json()["id"] })
+
+        try:
+            # Prepare spreadsheet to have submission data sent to it
+            form_question_texts = [page["question_text"] for page in test_form["pages"]]
+            sheet_name = "Sheet1"
+
+            # this only works for forms with fewer than 26 questions.
+            # I can't figure out how to use R1C1 notation however
+            header_end_column = chr(ord("A") + len(form_question_texts) - 1)
+            header_address = f"A1:{header_end_column}1"
+
+            response = session.patch(
+                f"{file_drive_item_url}/workbook/worksheets/{sheet_name}/range(address='{header_address}')",
+                json={
+                    "values": [form_question_texts],
+                },
+            )
+            response.raise_for_status()
+
+            response = session.post(
+                f"{file_drive_item_url}/workbook/tables/add",
+                timeout=30,
+                json={
+                    "address": f"{sheet_name}!{header_address}",
+                    "hasHeaders": True,
+                },
+            )
+            response.raise_for_status()
+
+            table = response.json()
+            print({"table": table})
+        finally:
+            response = session.post(
+                f"{file_drive_item_url}/workbook/closeSession",
+                timeout=30,
+                json={},
+            )
 
         return f"""
             <h1>Created Excel spreadsheet</h1>
 
             <p>
-                {repr(response.json())}
+                Table ID: {table['id']}
             </p>
+
+            <a href="{file['webUrl']}">{file['name']}</a>
         """
+
+# For now use a fake form record
+test_form = {
+    "id": 1,
+    "name": "Test form",
+    "pages": [
+        { "question_text": "What’s your name?", },
+        { "question_text": "When’s your date of birth?", },
+        { "question_text": "What’s your address?", },
+    ],
+}
