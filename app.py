@@ -16,6 +16,10 @@ auth = Auth(
     redirect_uri="http://localhost:5000/auth/callback",
 )
 
+# Although we don't need all scopes for all requests, it's better to request everything up-front,
+# otherwise there can be more than one consent page for the form creator
+scopes = ["Files.ReadWrite.AppFolder"]
+
 @app.route("/")
 def index():
     return f"""
@@ -30,7 +34,7 @@ def index():
     """
 
 @app.route("/auth")
-@auth.login_required
+@auth.login_required(scopes=scopes)
 def authenticated(*, context):
     return f"""
         <h1>Authenticated</h1>
@@ -46,7 +50,7 @@ def authenticated(*, context):
     """
 
 @app.route("/create", methods=["GET", "POST"])
-@auth.login_required(scopes=["Files.ReadWrite.AppFolder"])
+@auth.login_required(scopes=scopes)
 def create(*, context):
     drives = requests.get(
         "https://graph.microsoft.com/v1.0/me/drives",
