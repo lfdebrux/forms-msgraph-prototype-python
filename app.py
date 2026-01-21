@@ -87,44 +87,45 @@ def new(*, context):
 @app.post("/create")
 @auth.login_required(scopes=scopes)
 def create(*, context):
-    drive_id = request.form['drive']
+    with requests.Session() as session:
+        session.headers.update({"Authorization": f"Bearer {context['access_token']}"})
 
-    if not drive_id:
-        return redirect("/new")
+        drive_id = request.form['drive']
 
-    response = requests.get(
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/special/approot",
-        headers={"Authorization": f"Bearer {context['access_token']}"},
-        timeout=30
-    )
-    response.raise_for_status()
+        if not drive_id:
+            return redirect("/new")
 
-    approot = response.json()
-    print({"approot": approot})
+        response = session.get(
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/special/approot",
+            timeout=30
+        )
+        response.raise_for_status()
 
-    approot_item_id = approot["id"]
-    form_name = "Test form"
-    file_name = f"{ form_name }.xlsx"
+        approot = response.json()
+        print({"approot": approot})
 
-    # This is documented in https://learn.microsoft.com/en-us/answers/questions/830336/is-there-any-ms-graph-api-to-create-workbook-in-gi#answer-1348868 (and nowhere else?)
-    response = requests.post(
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{approot_item_id}/children",
-        headers={"Authorization": f"Bearer {context['access_token']}"},
-        timeout=30,
-        json={
-            "name": file_name,
-            "file": { },
-            "@microsoft.graph.conflictBehavior": "rename",
-        }
-    )
-    response.raise_for_status()
+        approot_item_id = approot["id"]
+        form_name = "Test form"
+        file_name = f"{ form_name }.xlsx"
 
-    print(response.json())
+        # This is documented in https://learn.microsoft.com/en-us/answers/questions/830336/is-there-any-ms-graph-api-to-create-workbook-in-gi#answer-1348868 (and nowhere else?)
+        response = session.post(
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{approot_item_id}/children",
+            timeout=30,
+            json={
+                "name": file_name,
+                "file": { },
+                "@microsoft.graph.conflictBehavior": "rename",
+            }
+        )
+        response.raise_for_status()
 
-    return f"""
-        <h1>Created Excel spreadsheet</h1>
+        print(response.json())
 
-        <p>
-            {repr(response.json())}
-        </p>
-    """
+        return f"""
+            <h1>Created Excel spreadsheet</h1>
+
+            <p>
+                {repr(response.json())}
+            </p>
+        """
