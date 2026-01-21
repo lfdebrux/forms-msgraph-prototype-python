@@ -10,7 +10,7 @@ app.config.from_prefixed_env(prefix="SETTINGS_") # load config from any envvar s
 
 auth = Auth(
     app,
-    authority=f"https://login.microsoftonline.com/{app.config['GRAPH_API']['TENANT_ID']}",
+    authority=f"https://login.microsoftonline.com/common",
     client_id=app.config["GRAPH_API"]["CLIENT_ID"],
     client_credential=app.config["GRAPH_API"]["CLIENT_SECRET"],
     redirect_uri="http://localhost:5000/auth/callback",
