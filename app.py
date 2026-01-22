@@ -16,40 +16,26 @@ auth = Auth(
     redirect_uri="http://localhost:5000/auth/callback",
 )
 
-# Although we don't need all scopes for all requests, it's better to request everything up-front,
-# otherwise there can be more than one consent page for the form creator
-scopes = ["Files.ReadWrite.AppFolder"]
+excel_scopes = ["Files.ReadWrite.AppFolder"]
 
 @app.route("/")
 def index():
     return f"""
-        <h1>Testing writing to Excel file</h1>
+        <h1>GOV.UK Forms prototype - Sending submissions to an Excel spreadsheet</h1>
 
         <p>
-            Tenant: {auth._authority} </br>
-            Client ID: {auth._client_id}
+            The following links require you to be signed in to a Microsoft account,
+            and may ask your consent for various permissions.
+            <br />
+            Don’t agree to anything you’re not comfortable with!
         </p>
 
-        <a href="/auth">Authenticate with Microsoft Graph</a>
+        <a href="/excel/new">Create a new Excel spreadsheet</a>
     """
 
-@app.route("/auth")
-@auth.login_required(scopes=scopes)
-def authenticated(*, context):
-    return f"""
-        <h1>Authenticated</h1>
-
-        <p>
-            Name: {context["user"]["name"]} </br>
-            Email: {context["user"]["preferred_username"]}
-        </p>
-
-        <a href="/new">Create an Excel spreadsheet</a>
-    """
-
-@app.route("/new")
-@auth.login_required(scopes=scopes)
-def new(*, context):
+@app.route("/excel/new")
+@auth.login_required(scopes=excel_scopes)
+def excel_new(*, context):
     response = requests.get(
         "https://graph.microsoft.com/v1.0/me/drives",
         headers={"Authorization": f"Bearer {context['access_token']}"},
@@ -70,7 +56,7 @@ def new(*, context):
     return render_template_string("""
         <h1>Choose a drive to store the spreadsheet in</h1>
 
-        <form action="/create" method="post">
+        <form action="/excel/create" method="post">
             <fieldset>
                 {% for drive_name, drive_id in drive_ids.items() %}
                 <div>
@@ -84,9 +70,9 @@ def new(*, context):
         </form>
     """, drive_ids=drive_ids)
 
-@app.post("/create")
-@auth.login_required(scopes=scopes)
-def create(*, context):
+@app.post("/execl/create")
+@auth.login_required(scopes=excel_scopes)
+def excel_create(*, context):
     with requests.Session() as session:
         session.headers.update({"Authorization": f"Bearer {context['access_token']}"})
 
