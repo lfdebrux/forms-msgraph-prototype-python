@@ -124,17 +124,19 @@ def excel_create(*, context):
         try:
             # Prepare spreadsheet to have submission data sent to it
             form_question_texts = [page["question_text"] for page in test_form["pages"]]
+            headers = ["Reference", "Submitted at", **form_question_texts]
             sheet_name = "Sheet1"
 
-            # this only works for forms with fewer than 26 questions.
+            # There's probably a smarter way to do this...?
+            # this only works for forms with fewer than 24 questions.
             # I can't figure out how to use R1C1 notation however
-            header_end_column = chr(ord("A") + len(form_question_texts) - 1)
+            header_end_column = chr(ord("A") + len(headers) - 1)
             header_address = f"A1:{header_end_column}1"
 
             response = session.patch(
                 f"{file_drive_item_url}/workbook/worksheets/{sheet_name}/range(address='{header_address}')",
                 json={
-                    "values": [form_question_texts],
+                    "values": [headers],
                 },
             )
             response.raise_for_status()
