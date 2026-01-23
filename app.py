@@ -90,13 +90,13 @@ def excel_create(*, context):
         approot = response.json()
         #print({"approot": approot})
 
-        approot_item_id = approot["id"]
+        approot_drive_item_id = approot["id"]
         form_name = test_form["name"]
         file_name = f"{ form_name }.xlsx"
 
         # This is documented in https://learn.microsoft.com/en-us/answers/questions/830336/is-there-any-ms-graph-api-to-create-workbook-in-gi#answer-1348868 (and nowhere else?)
         response = session.post(
-            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{approot_item_id}/children",
+            f"https://graph.microsoft.com/v1.0/drive/items/{approot_drive_item_id}/children",
             timeout=30,
             json={
                 "name": file_name,
@@ -109,7 +109,7 @@ def excel_create(*, context):
         file = response.json()
         #print({ "file": file })
 
-        file_drive_item_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file['id']}"
+        file_drive_item_url = f"https://graph.microsoft.com/v1.0/drive/items/{file['id']}"
 
         # Working with Excel is better with a worbook session, see https://learn.microsoft.com/en-gb/graph/workbook-best-practice.
         # Oh, one other thing to note, for this and other calls to Excel APIs, the docs say that occassionally there can be a 504 error,
