@@ -128,7 +128,7 @@ def excel_create(*, context):
         try:
             # Prepare spreadsheet to have submission data sent to it
             form_question_texts = [page["question_text"] for page in test_form["pages"]]
-            headers = ["Reference", "Submitted at", **form_question_texts]
+            headers = ["Reference", "Submitted at", *form_question_texts]
             sheet_name = "Sheet1"
 
             # There's probably a smarter way to do this...?
