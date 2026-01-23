@@ -70,7 +70,7 @@ def excel_new(*, context):
         </form>
     """, drive_ids=drive_ids)
 
-@app.post("/execl/create")
+@app.post("/excel/create")
 @auth.login_required(scopes=excel_scopes)
 def excel_create(*, context):
     with requests.Session() as session:
