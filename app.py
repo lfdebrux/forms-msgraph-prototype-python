@@ -111,7 +111,11 @@ def excel_create(*, context):
 
         file_drive_item_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file['id']}"
 
-        # Working with Excel is better with a worbook session, see https://learn.microsoft.com/en-gb/graph/workbook-best-practice
+        # Working with Excel is better with a worbook session, see https://learn.microsoft.com/en-gb/graph/workbook-best-practice.
+        # Oh, one other thing to note, for this and other calls to Excel APIs, the docs say that occassionally there can be a 504 error,
+        # and the correct response is to retry the request. Don't believe me? See https://learn.microsoft.com/en-us/graph/api/workbook-createsession#error-handling
+        # Anyway, for this prototype we're not going to worry about that, we'll just raise an exception in case of any HTTP errors,
+        # but I thought it was worth noting it down.
         response = session.post(
             f"{file_drive_item_url}/workbook/createSession",
             timeout=30,
@@ -152,7 +156,7 @@ def excel_create(*, context):
             response.raise_for_status()
 
             table = response.json()
-            print({"table": table})
+            #print({"table": table})
         finally:
             response = session.post(
                 f"{file_drive_item_url}/workbook/closeSession",
