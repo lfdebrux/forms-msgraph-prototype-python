@@ -10,7 +10,7 @@ app.config.from_prefixed_env(prefix="SETTINGS_") # load config from any envvar s
 
 auth = Auth(
     app,
-    authority=f"https://login.microsoftonline.com/common",
+    authority=f"https://login.microsoftonline.com/{app.config['GRAPH_API']['TENANT_ID']}",
     client_id=app.config["GRAPH_API"]["CLIENT_ID"],
     client_credential=app.config["GRAPH_API"]["CLIENT_SECRET"],
     redirect_uri="http://localhost:5000/auth/callback",
@@ -37,38 +37,31 @@ def index():
 @auth.login_required(scopes=excel_scopes)
 def excel_new(*, context):
     response = requests.get(
-        "https://graph.microsoft.com/v1.0/me/drives",
+        "https://graph.microsoft.com/v1.0/me/drive/special/approot",
         headers={"Authorization": f"Bearer {context['access_token']}"},
         timeout=30,
     )
     response.raise_for_status()
 
-    drives = response.json()
-    #print({"drives": drives})
+    approot = response.json()
+    #print({"approot": approot})
 
-    # NOTE: we probably want to filter out OneDrive and ODCMetadataArchive
-    # NOTE: might be better to look at sites rather than drives?
-    drive_ids = {
-        drive['name']: drive['id']
-        for drive in drives['value']
-    }
+    drive_id = approot["parentReference"]["driveId"]
 
     return render_template_string("""
-        <h1>Choose a drive to store the spreadsheet in</h1>
+        <h1>Create a new Excel spreadsheet</h1>
+
+        <p>
+            This will create a new Excel spreadsheet,
+            in a special app folder in your personal OneDrive
+        </p>
 
         <form action="/excel/create" method="post">
-            <fieldset>
-                {% for drive_name, drive_id in drive_ids.items() %}
-                <div>
-                    <input type="radio" id="{{ drive_id }}" name="drive" value="{{ drive_id }}" />
-                    <label for="{{ drive_id }}">{{ drive_name }}</label>
-                </div>
-                {% endfor %}
-            </fieldset>
+            <input type="hidden" name="drive" value="{{ drive_id }}" />
 
-            <button>Create Excel spreadsheet here</button>
+            <button>Create Excel spreadsheet</button>
         </form>
-    """, drive_ids=drive_ids)
+    """, drive_id=drive_id)
 
 @app.post("/excel/create")
 @auth.login_required(scopes=excel_scopes)
@@ -110,6 +103,26 @@ def excel_create(*, context):
         #print({ "file": file })
 
         file_drive_item_url = f"https://graph.microsoft.com/v1.0/drive/items/{file['id']}"
+
+        breakpoint()
+
+        # Before we do anything else, we should set the permissions of the new file so that this app can access it using the
+        # Files.SelectedOperations.Selected scope. Doing this means that a) the app only needs the File.ReadWrite.AppFolder
+        # scope as a delegated permission, b) the form processor can (in theory) move the file out of the app folder and we
+        # can still access it, and c) administrators can revoke access to individual files as they wish.
+        response = session.post(
+            f"{file_drive_item_url}/permissions",
+            timeout=30,
+            json={
+                "roles": ["write"],
+                "grantedTo": {
+                    "application": {
+                        "id": app.config["GRAPH_API"]["CLIENT_ID"],
+                    },
+                },
+            },
+        )
+        response.raise_for_status()
 
         # Working with Excel is better with a worbook session, see https://learn.microsoft.com/en-gb/graph/workbook-best-practice.
         # Oh, one other thing to note, for this and other calls to Excel APIs, the docs say that occassionally there can be a 504 error,
