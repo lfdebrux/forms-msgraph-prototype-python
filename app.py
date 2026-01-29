@@ -1,3 +1,5 @@
+from pprint import pp
+
 import requests
 from flask import Flask, render_template_string, request
 
@@ -16,7 +18,9 @@ auth = Auth(
     redirect_uri="http://localhost:5000/auth/callback",
 )
 
-excel_scopes = ["Files.ReadWrite.AppFolder"]
+excel_scopes = [
+    "Files.ReadWrite", # needed to create the spreadsheet
+]
 
 @app.route("/")
 def index():
@@ -37,23 +41,23 @@ def index():
 @auth.login_required(scopes=excel_scopes)
 def excel_new(*, context):
     response = requests.get(
-        "https://graph.microsoft.com/v1.0/me/drive/special/approot",
+        "https://graph.microsoft.com/v1.0/me/drive",
         headers={"Authorization": f"Bearer {context['access_token']}"},
         timeout=30,
     )
     response.raise_for_status()
 
-    approot = response.json()
-    #print({"approot": approot})
+    drive = response.json()
+    #print({"drive": drive})
 
-    drive_id = approot["parentReference"]["driveId"]
+    drive_id = drive["id"]
 
     return render_template_string("""
         <h1>Create a new Excel spreadsheet</h1>
 
         <p>
             This will create a new Excel spreadsheet,
-            in a special app folder in your personal OneDrive
+            in your personal OneDrive
         </p>
 
         <form action="/excel/create" method="post">
@@ -74,22 +78,12 @@ def excel_create(*, context):
         if not drive_id:
             return redirect("/new")
 
-        response = session.get(
-            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/special/approot",
-            timeout=30
-        )
-        response.raise_for_status()
-
-        approot = response.json()
-        #print({"approot": approot})
-
-        approot_drive_item_id = approot["id"]
         form_name = test_form["name"]
         file_name = f"{ form_name }.xlsx"
 
         # This is documented in https://learn.microsoft.com/en-us/answers/questions/830336/is-there-any-ms-graph-api-to-create-workbook-in-gi#answer-1348868 (and nowhere else?)
         response = session.post(
-            f"https://graph.microsoft.com/v1.0/drive/items/{approot_drive_item_id}/children",
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children",
             timeout=30,
             json={
                 "name": file_name,
@@ -100,11 +94,19 @@ def excel_create(*, context):
         response.raise_for_status()
 
         file = response.json()
-        #print({ "file": file })
+        pp({ "file": file })
 
-        file_drive_item_url = f"https://graph.microsoft.com/v1.0/drive/items/{file['id']}"
+        # We have to use the drive ID and item ID, there doesn't appear to be a way to address a file
+        # that is robust to the file being moved from one drive/SharePoint document library to another
+        file_drive_item_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file['id']}"
 
-        breakpoint()
+        # # Because we created the file, in the App folder, the file should already have the permissions needed
+        # # for the Files.SelectedOperations.Selected scope to work with this application.
+        # response = session.get(
+        #     f"{file_drive_item_url}/permissions",
+        #     timeout=30,
+        # )
+        # response.raise_for_status()
 
         # Before we do anything else, we should set the permissions of the new file so that this app can access it using the
         # Files.SelectedOperations.Selected scope. Doing this means that a) the app only needs the File.ReadWrite.AppFolder
@@ -123,6 +125,10 @@ def excel_create(*, context):
             },
         )
         response.raise_for_status()
+
+        permissions = response.json()
+        pp({"permissions": permissions})
+
 
         # Working with Excel is better with a worbook session, see https://learn.microsoft.com/en-gb/graph/workbook-best-practice.
         # Oh, one other thing to note, for this and other calls to Excel APIs, the docs say that occassionally there can be a 504 error,
@@ -180,9 +186,12 @@ def excel_create(*, context):
         return f"""
             <h1>Created Excel spreadsheet</h1>
 
-            <p>
-                Table ID: {table['id']}
-            </p>
+            <dl>
+                <dt>Spreadsheet drive ID:</dt> <dd>{file['parentReference']['driveId']}</dd>
+                <dt>Spreadsheet driveItem ID:</dt> <dd>{file['id']}</dd>
+                <dt>Spreadsheet driveItem URL:</dt> <dd>https://graph.microsoft.com/v1.0/drives/{file['parentReference']['driveId']}/items/{file['id']}</dd>
+                <dt>Table ID:</dt> <dd>{table['id']}</dd>
+            </dl>
 
             <a href="{file['webUrl']}">{file['name']}</a>
         """
